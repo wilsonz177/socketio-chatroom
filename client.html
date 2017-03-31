@@ -33,10 +33,12 @@
          
          $("#join").click(function(){
             var pub = $("#allrooms").val();
-            var room = $("#allrooms").text();
+            var room = $("#allrooms option:selected").text();
+            console.log("pub: ", pub);
+            console.log("room: ", room);
             var pass = $("#privatepassword").val();
            
-            socketio.emit("join", room, pub, pass);
+            socketio.emit("join",{"room": room, "pub":pub, "pass": pass});
          });
          
           $("#send").click(function(){
@@ -98,7 +100,7 @@
             console.log("loading");
             for (var key in rooms){
                console.log(key);
-               if (pub === true){
+               if (key.pub === true){
                   $("#allrooms").append($('<option>', { 
                         value: "true",
                         text : key

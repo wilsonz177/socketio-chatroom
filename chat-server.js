@@ -34,33 +34,35 @@ io.sockets.on("connection", function(socket){
 		socket.emit("loadpage", rooms);
     });
 
-	 socket.on("join", function(room, pub, pass){
+	 socket.on("join", function(data){
 		
-		var banned = false;
-		for (i = 0; i < rooms[room].banned.length; ++i){
-			if (people[socket.id].name == rooms[room].banned[i]){
-				banned = true;
+		var b = false;
+		console.log(data);
+		console.log(rooms[data.room].banned);
+		for (var i = 0; i < rooms[data.room].banned.length; ++i){
+			if (people[socket.id].name == rooms[data.room].banned[i]){
+				b = true;
 			}
 		}
 		
-		if(banned){
+		if(b){
 			socket.emit("banned");
 		}else{
 		
 		
-		if (pub === "false"){
-			if (rooms[room].pass == pass){
-				people[socket.id].room = room;
-				rooms[room].users.push(socket.id);
-				io.sockets.emit("update", rooms[room].users);
+		if (data.pub == "false"){
+			if (rooms[data.room].pass == data.pass){
+				people[socket.id].room = data.room;
+				rooms[data.room].users.push(socket.id);
+				io.sockets.emit("update", rooms[data.room].users);
 			} else {
 				socket.emit("wrongpassword");
 			}
 		}else{
 
-				people[socket.id].room = room;
-				rooms[room].users.push(socket.id);
-				io.sockets.emit("update", rooms[room].users);
+				people[socket.id].room = data.room;
+				rooms[data.room].users.push(socket.id);
+				io.sockets.emit("update", rooms[data.room].users);
 			
 		}
 		}
