@@ -1,6 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
    <head>
+      <!-- Latest compiled and minified CSS -->
+      <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+      <!-- jQuery library -->
+      <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
+      <!-- Latest compiled JavaScript -->
+      <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+      
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
       <script src="/socket.io/socket.io.js"></script>
 
@@ -9,26 +16,46 @@
       $(document).ready(function() {
          var socketio = io.connect();
          $("#message").hide();
+         $("#rooms").hide();
+         $("#users").hide();
          $("form").submit(function(event){
             event.preventDefault();
          });
          
-         $("#join").click(function(){
+         $("#submitusername").click(function(){ //just adds the new user
             var name = $("#name").val();
-            if (name != "") {
-                socketio.emit("join", name);
+            if (name !== "") {
+                socketio.emit("submitusername", name);
                 $("#login").detach();
-                $("#message").show();
-                //$("#msg").focus();
-                ready = true;
+                $("#rooms").show();
             }
+         });
+         
+         $("#join").click(function(){
+            var pub = $("#allrooms").val();
+            var room = $("#allrooms").text();
+            var pass = $("#privatepassword").val();
+           
+            socketio.emit("join", room, pub, pass);
          });
          
           $("#send").click(function(){
             var msg = $("#messageToChat").val();
-            console.log("this is the message: " + msg);
             socketio.emit("message_to_server", msg);
          });
+          
+         $("#create").click(function(){
+            var roomname = $("chatroomname").val();
+            var type = $("typeofroom").val();
+            var password = $("chatroompassword").val();
+            var a = true;
+            if (type == "private"){
+               a = false;
+            }
+            console.log("pressed create");
+            socketio.emit("createroom", { "roomname": roomname, "pub": a, "password": password});
+         });
+          
           
          $("#message").keypress(function(e){
             if(e.which == 13) {
@@ -37,33 +64,73 @@
                 $("#message").val("");
             }
          });
-          
-         socketio.on("update", function(msg) {
-            if(ready)
-                $("#msgs").append("" + msg + "");
-                
+         
+         $("#typeofroom").on('change', function() {
+            if ($("#typeofroom").val() == "private") {
+                $("#setpassword").show();
+            }
+            if ($("#typeofroom").val() == "public") {
+                $("#setpassword").hide();
+            }
+            
+          });
+         
+         $("#allrooms").on('change', function() {
+            if ($("#allrooms").val() == "false") {
+                $("#passwordforprivateroom").show();
+            }
+            if ($("#allrooms").val() == "true") {
+               $("#passwordforprivateroom").hide();
+            }
+            
+          });
+         
+         socketio.on("banned", function() {
+
+                $("#msgfromroom").append("You're banned from this room!");            
+         });
+         
+         socketio.on("wrongpassword", function() {     
+               $("#privatepassword").attr("placeholder", "Wrong Password!");             
+         });
+         
+         socketio.on("loadpage", function(rooms) {
+            console.log("loading");
+            for (var key in rooms){
+               console.log(key);
+               if (pub === true){
+                  $("#allrooms").append($('<option>', { 
+                        value: "true",
+                        text : key
+                    }));
+               } else {
+                   $("#allrooms").append($('<option>', { 
+                        value: "false",
+                        text : key
+                    }));
+               }
+            }
          });
 
-         socketio.on("update-people", function(people){
-            if(ready) {
+         socketio.on("update", function(people){
+            console.log("about to hide room options");
+                $("#allrooms").hide();
+                $("#message").show();
                 $("#people").empty();
-                $.each(people, function(clientid, name) {
+                $.each(people, function(socketid, name) {
                     $('#people').append("" + name + "");
                 });
-            }
          });
          
          socketio.on("message_to_client", function(who, msg){
-            if(ready) {
                 $("#msgs").append("" + who + " says: " + msg + "");
-            }
          });
          
-         socketio.on("disconnect", function(){
-            $("#msgs").append("The server is not available");
-            $("#message").attr("disabled", "disabled");
-            $("#send").attr("disabled", "disabled");
-         });
+         //socketio.on("disconnect", function(){
+         //   $("#msgs").append("The server is not available");
+         //   $("#message").attr("disabled", "disabled");
+         //   $("#send").attr("disabled", "disabled");
+         //});
              
       });
       
@@ -74,16 +141,46 @@
    </head>
    <body>
       
-      <div>
-         People: 
-         <ul id="people"></ul>
-      </div>
-      
+            
       <div id="login">
          <form>
             Username: <input type="text" id="name">
-                      <input type="button" name="join" id="join" value="Join">
+                      <input type="button" name="submitusername" id="submitusername" value="Submit">
          </form>
+      </div>
+      
+      
+      <div id="rooms">
+         All Chatrooms:
+         <select id="allrooms">
+
+         </select>
+         <div id="passwordforprivateroom">
+               Password: <input type="text" id="privatepassword" placeholder="">
+         </div>
+         <ul id="msgfromroom">  
+         
+         <input type="button" name="join" id="join" value="Join">
+         
+         <form id = "newchatroom">
+            Create Chatroom
+            
+            Name of Room: <input type="text" id="chatroomname">
+            <select id="typeofroom">
+               <option value="private" selected="selected">Private</option>
+               <option value="public" >Public</option>
+            </select>
+            <div id="setpassword">
+               Set Password: <input type="text" id="chatroompassword">
+            </div>
+                  <input type="submit" name="create" id="create" value="Create">
+         </form>
+      </div>
+         
+            
+      <div id="users">
+         People: 
+         <ul id="people"></ul>
       </div>
       
       <div id="message">
@@ -94,6 +191,7 @@
       </div>
       
       <div id="chatlog">
+
          <ul id="msgs">   
       </div>
       
