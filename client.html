@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html>
    <head>
+      <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
       <script src="/socket.io/socket.io.js"></script>
-      
-      
-      <script type ="text/javascript">
- 
 
+ 
+      <script>
       $(document).ready(function() {
          var socketio = io.connect();
          $("#message").hide();
@@ -17,7 +16,7 @@
          $("#join").click(function(){
             var name = $("#name").val();
             if (name != "") {
-                socket.emit("join", name);
+                socketio.emit("join", name);
                 $("#login").detach();
                 $("#message").show();
                 //$("#msg").focus();
@@ -25,13 +24,27 @@
             }
          });
          
-         
-         socket.on("update", function(msg) {
+          $("#send").click(function(){
+            var msg = $("#messageToChat").val();
+            console.log("this is the message: " + msg);
+            socketio.emit("message_to_server", msg);
+         });
+          
+         $("#message").keypress(function(e){
+            if(e.which == 13) {
+                var msg = $("#message").val();
+                socketio.emit("send", msg);
+                $("#message").val("");
+            }
+         });
+          
+         socketio.on("update", function(msg) {
             if(ready)
                 $("#msgs").append("" + msg + "");
-         })
+                
+         });
 
-         socket.on("update-people", function(people){
+         socketio.on("update-people", function(people){
             if(ready) {
                 $("#people").empty();
                 $.each(people, function(clientid, name) {
@@ -40,59 +53,19 @@
             }
          });
          
-         socket.on("chat", function(who, msg){
+         socketio.on("message_to_client", function(who, msg){
             if(ready) {
                 $("#msgs").append("" + who + " says: " + msg + "");
             }
          });
          
-         socket.on("disconnect", function(){
+         socketio.on("disconnect", function(){
             $("#msgs").append("The server is not available");
             $("#message").attr("disabled", "disabled");
             $("#send").attr("disabled", "disabled");
          });
-         
-         $("#send").click(function(){
-            var msg = $("#message").val();
-            socket.emit("send", msg);
-            $("#message").val("");
-         });
-         
-         $("#message").keypress(function(e){
-            if(e.which == 13) {
-                var msg = $("#message").val();
-                socket.emit("send", msg);
-                $("#message").val("");
-            }
-         });
-         
-         
-         
-         
+             
       });
- 
- 
- 
- 
- 
- 
- 
-      
-      socketio.on("message_to_client",function(data) {
-         //Append an HR thematic break and the escaped HTML of the new message
-         document.getElementById("chatlog").appendChild(document.createElement("hr"));
-         document.getElementById("chatlog").appendChild(document.createTextNode(data['username']));
-         document.getElementById("chatlog").appendChild(document.createTextNode(data['message']));
-
-      });
- 
-      function sendMessage(){
-         var user = document.getElementById("user_input").value;
-         //document.getElementById("chatlog0").appendChild(document.createTextNode(username));
-         var msg = document.getElementById("message_input").value;
-         socketio.emit("message_to_server", {username:user, message:msg});
-      }
-      
       
       </script>
       
@@ -102,6 +75,7 @@
    <body>
       
       <div>
+         People: 
          <ul id="people"></ul>
       </div>
       
@@ -114,7 +88,7 @@
       
       <div id="message">
          <form>
-            Your message: <input type="text" id="message">
+            Your message: <input type="text" id="messageToChat">
                           <input type="button" name="send" id="send" value="Send">
          </form>
       </div>

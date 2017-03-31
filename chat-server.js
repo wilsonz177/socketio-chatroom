@@ -29,24 +29,15 @@ io.sockets.on("connection", function(socket){
         io.sockets.emit("update-people", people);
     });
 	
-	socket.on("send", function(msg){
-        io.sockets.emit("chat", people[client.id], msg);
-    });
+//	socket.on("disconnect", function(){
+//        io.sockets.emit("update", people[client.id] + " has left the server.");
+//        delete people[client.id];
+//        io.sockets.emit("update-people", people);
+//    });
 	
-	socket.on("disconnect", function(){
-        io.sockets.emit("update", people[client.id] + " has left the server.");
-        delete people[client.id];
-        io.sockets.emit("update-people", people);
-    });
-	
-	
- 
-	socket.on('message_to_server', function(data) {
+	socket.on('message_to_server', function(msg) {
 		// This callback runs when the server receives a new message from the client.
-		
-		//console.log("message: "+data["message"]); // log it to the Node.JS output
-		//console.log("username: "+data["username"]);
-		
-		io.sockets.emit("message_to_client",{message:data["message"], username:data["username"]}) // broadcast the message to other users
+
+		io.sockets.emit("message_to_client", people[socket.id], msg); // broadcast the message to other users
 	});
 });
