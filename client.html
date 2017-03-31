@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+   <head>
+      <script src="/socket.io/socket.io.js"></script>
+      
+      
+      <script type ="text/javascript">
+ 
+
+      $(document).ready(function() {
+         var socketio = io.connect();
+         $("#message").hide();
+         $("form").submit(function(event){
+            event.preventDefault();
+         });
+         
+         $("#join").click(function(){
+            var name = $("#name").val();
+            if (name != "") {
+                socket.emit("join", name);
+                $("#login").detach();
+                $("#message").show();
+                //$("#msg").focus();
+                ready = true;
+            }
+         });
+         
+         
+         socket.on("update", function(msg) {
+            if(ready)
+                $("#msgs").append("" + msg + "");
+         })
+
+         socket.on("update-people", function(people){
+            if(ready) {
+                $("#people").empty();
+                $.each(people, function(clientid, name) {
+                    $('#people').append("" + name + "");
+                });
+            }
+         });
+         
+         socket.on("chat", function(who, msg){
+            if(ready) {
+                $("#msgs").append("" + who + " says: " + msg + "");
+            }
+         });
+         
+         socket.on("disconnect", function(){
+            $("#msgs").append("The server is not available");
+            $("#message").attr("disabled", "disabled");
+            $("#send").attr("disabled", "disabled");
+         });
+         
+         $("#send").click(function(){
+            var msg = $("#message").val();
+            socket.emit("send", msg);
+            $("#message").val("");
+         });
+         
+         $("#message").keypress(function(e){
+            if(e.which == 13) {
+                var msg = $("#message").val();
+                socket.emit("send", msg);
+                $("#message").val("");
+            }
+         });
+         
+         
+         
+         
+      });
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+      
+      socketio.on("message_to_client",function(data) {
+         //Append an HR thematic break and the escaped HTML of the new message
+         document.getElementById("chatlog").appendChild(document.createElement("hr"));
+         document.getElementById("chatlog").appendChild(document.createTextNode(data['username']));
+         document.getElementById("chatlog").appendChild(document.createTextNode(data['message']));
+
+      });
+ 
+      function sendMessage(){
+         var user = document.getElementById("user_input").value;
+         //document.getElementById("chatlog0").appendChild(document.createTextNode(username));
+         var msg = document.getElementById("message_input").value;
+         socketio.emit("message_to_server", {username:user, message:msg});
+      }
+      
+      
+      </script>
+      
+      
+   
+   </head>
+   <body>
+      
+      <div>
+         <ul id="people"></ul>
+      </div>
+      
+      <div id="login">
+         <form>
+            Username: <input type="text" id="name">
+                      <input type="button" name="join" id="join" value="Join">
+         </form>
+      </div>
+      
+      <div id="message">
+         <form>
+            Your message: <input type="text" id="message">
+                          <input type="button" name="send" id="send" value="Send">
+         </form>
+      </div>
+      
+      <div id="chatlog">
+         <ul id="msgs">   
+      </div>
+      
+   </body>
+</html>
