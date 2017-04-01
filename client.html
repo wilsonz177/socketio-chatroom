@@ -32,6 +32,7 @@
          });
          
          $("#join").click(function(){
+            $("#msgs").empty();    
             var pub = $("#allrooms").val();
             var room = $("#allrooms option:selected").text();
             console.log("pub: ", pub);
@@ -47,14 +48,18 @@
          });
           
          $("#create").click(function(){
-            var roomname = $("chatroomname").val();
-            var type = $("typeofroom").val();
-            var password = $("chatroompassword").val();
+             $("#msgs").empty();  
+            var roomname = $("#chatroomname").val();
+            var type = $("#typeofroom option:selected").text();
+            var password = $("#chatroompassword").val();
             var a = true;
-            if (type == "private"){
+            if (type == "Private"){
                a = false;
             }
             console.log("pressed create");
+            console.log("roomname:" + roomname);
+            console.log("pub?" + a);
+            console.log("password: " + password);
             socketio.emit("createroom", { "roomname": roomname, "pub": a, "password": password});
          });
           
@@ -78,10 +83,12 @@
           });
          
          $("#allrooms").on('change', function() {
-            if ($("#allrooms").val() == "false") {
+            $("#message").hide();
+            $("#chatlog").hide();
+            if ($("#allrooms option:selected").val() == "false") {
                 $("#passwordforprivateroom").show();
             }
-            if ($("#allrooms").val() == "true") {
+            if ($("#allrooms option:selected").val() == "true") {
                $("#passwordforprivateroom").hide();
             }
             
@@ -93,14 +100,19 @@
          });
          
          socketio.on("wrongpassword", function() {     
-               $("#privatepassword").attr("placeholder", "Wrong Password!");             
+               $("#privatepassword").attr("placeholder", "Wrong Password!");
+               $("#message").hide();
          });
-         
+       
          socketio.on("loadpage", function(rooms) {
             console.log("loading");
+              $("#allrooms").empty();
+            
+            $("#passwordforprivateroom").hide();
             for (var key in rooms){
-               console.log(key);
-               if (key.pub === true){
+               console.log("this is the rooms public/private:" + rooms[key].pub);
+
+               if (rooms[key].pub === true){
                   $("#allrooms").append($('<option>', { 
                         value: "true",
                         text : key
@@ -115,9 +127,9 @@
          });
 
          socketio.on("update", function(people){
-            console.log("about to hide room options");
-                $("#allrooms").hide();
                 $("#message").show();
+                $("#chatlog").show();
+                
                 $("#people").empty();
                 $.each(people, function(socketid, name) {
                     $('#people').append("" + name + "");

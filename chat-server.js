@@ -7,7 +7,7 @@ var rooms = {};
 rooms["CSE330"] = {
 				"admin": "",
 				"users": [],
-				"pub": "true",
+				"pub": true,
 				"pass": "",
 				"banned": []
 		};
@@ -36,7 +36,10 @@ io.sockets.on("connection", function(socket){
 
 	 socket.on("join", function(data){
 		
+		
+		
 		var b = false;
+		var switching = false;
 		console.log(data);
 		console.log(rooms[data.room].banned);
 		for (var i = 0; i < rooms[data.room].banned.length; ++i){
@@ -45,10 +48,30 @@ io.sockets.on("connection", function(socket){
 			}
 		}
 		
+		for (var j = 0; j < rooms[data.room].banned.length; ++j){
+			if (people[socket.id].name == rooms[data.room].users[j]){
+				switching = true;
+			}
+		}
+		
 		if(b){
 			socket.emit("banned");
-		}else{
+		}
 		
+		
+		else{
+		
+		if(switching){
+			for (var key in rooms){
+				
+			for (var k = 0; k < rooms[key].users.length; ++k){
+			if (people[socket.id].name == rooms[data.room].users[k]){
+				rooms[data.room].users.splice(i, 1); //deletes user from a room
+			}
+		}
+				
+			}
+		}
 		
 		if (data.pub == "false"){
 			if (rooms[data.room].pass == data.pass){
@@ -62,8 +85,12 @@ io.sockets.on("connection", function(socket){
 
 				people[socket.id].room = data.room;
 				rooms[data.room].users.push(socket.id);
-				io.sockets.emit("update", rooms[data.room].users);
-			
+				
+				var chatroom = data.room;
+				var allusersinchatroom = rooms[chatroom].users;
+				for (i = 0; i < allusersinchatroom.length; ++i) {
+				io.to(allusersinchatroom[i]).emit("update", rooms[data.room].users);
+				}
 		}
 		}
 		
@@ -71,7 +98,7 @@ io.sockets.on("connection", function(socket){
 	 
 	  socket.on("createroom", function(data){
         var roomAdmin = people[socket.id];
-		
+		console.log("this is the roomname: " + data.roomname);
 		rooms[data.roomname] = {
 				"admin": roomAdmin,
 				"users": [roomAdmin],
@@ -79,9 +106,14 @@ io.sockets.on("connection", function(socket){
 				"pass": data.password,
 				"banned": []
 		};
-		people[socket.id].room = roomname;
- console.log("about to emit update");
-        socket.emit("update", rooms[roomname].users);
+		people[socket.id].room = data.roomname;
+
+		console.log("about to emit loadpage");
+		io.sockets.emit("loadpage", rooms);
+		console.log("emitted loadpage");
+		console.log("about to emit update");
+        socket.emit("update", rooms[data.roomname].users);
+		
     });
 	
 //	socket.on("disconnect", function(){
