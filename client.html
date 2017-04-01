@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
    <head>
+      <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      
       <!-- Latest compiled and minified CSS -->
       <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
       <!-- jQuery library -->
@@ -11,6 +15,22 @@
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
       <script src="/socket.io/socket.io.js"></script>
 
+<!--<style>-->
+<!--      [class*="col-"] {-->
+<!--  padding-top: 15px;-->
+<!--  padding-bottom: 15px;-->
+<!--  background-color: #eee;-->
+<!--  background-color: rgba(86,61,124,.15);-->
+<!--  border: 1px solid #ddd;-->
+<!--  border: 1px solid rgba(86,61,124,.2);-->
+<!--}-->
+<!--    </style>-->
+ <style>
+   .form-group select{
+      display: inline-block;
+      width: auto;
+   }
+ </style>
  
       <script>
       $(document).ready(function() {
@@ -44,6 +64,7 @@
           $("#send").click(function(){
             var msg = $("#messageToChat").val();
             socketio.emit("message_to_server", msg);
+            $("#messageToChat").val("");
          });
           
          $("#create").click(function(){
@@ -59,11 +80,12 @@
          });
           
           
-         $("#message").keypress(function(e){
+         $("#message").keydown(function(e){
             if(e.which == 13) {
-                var msg = $("#message").val();
-                socketio.emit("send", msg);
-                $("#message").val("");
+               console.log("enter");
+                var msg = $("#messageToChat").val();
+                socketio.emit("message_to_server", msg);
+                $("#messageToChat").val("");
             }
          });
          
@@ -125,7 +147,23 @@
          });
          
          socketio.on("message_to_client", function(who, msg){
-                $("#msgs").append("" + who + " says: " + msg + "");
+                //$("#msgs").append("" + who + " says: " + msg + "");
+             console.log("who: ", who);
+             console.log("msg: ", msg);
+            var tr = $("<tr/>");
+            tr.append(
+               $("<td/>")
+                  .text(who + ": ")
+            );
+            tr.append(
+               $("<td/>")
+                  .text(msg)
+            );
+               
+               
+                
+            $("#msgs").append(tr);
+                                 
          });
          
          //socketio.on("disconnect", function(){
@@ -142,41 +180,57 @@
    
    </head>
    <body>
-      
+      <div class="container-fluid">
+       
+      <div>
+         <h3>Welcome to our Chatroom Portal</h3>
+      </div>  
             
-      <div id="login">
+      <div id="login" class="form-group" >
          <form>
-            Username: <input type="text" id="name">
-                      <input type="button" name="submitusername" id="submitusername" value="Submit">
+            <label for="name">Username</label>
+                      <input type="text" class="form-control" id="name"><br>
+                      <input type="button" name="submitusername" class="btn btn-primary" id="submitusername" value="Submit">
          </form>
       </div>
       
       
       <div id="rooms">
-         All Chatrooms:
-         <select id="allrooms">
-
-         </select>
-         <div id="passwordforprivateroom">
-               Password: <input type="text" id="privatepassword" placeholder="">
-         </div>
-         <ul id="msgfromroom">  
-         
-         <input type="button" name="join" id="join" value="Join">
-         
-         <form id = "newchatroom">
-            Create Chatroom
-            
-            Name of Room: <input type="text" id="chatroomname">
-            <select id="typeofroom">
-               <option value="private" selected="selected">Private</option>
-               <option value="public" >Public</option>
+         <div class="form-group">
+            <label for="allrooms">Chatrooms</label>
+            <select id="allrooms" class="form-control">
+   
             </select>
-            <div id="setpassword">
-               Set Password: <input type="text" id="chatroompassword">
+            <div id="passwordforprivateroom" class="form-inline">
+                  <label for="privatepassword">Password</label>
+                  <input type="text"  class="form-control" id="privatepassword" placeholder="">
             </div>
-                  <input type="submit" name="create" id="create" value="Create">
-         </form>
+         </div>
+         
+         <span id="msgfromroom">  
+         
+         <input type="button" name="join" id="join" value="Join" class="btn btn-primary">
+         
+         <div>
+            <form id = "newchatroom" class="form-inline">
+            <div class="form-group">
+               <h4>Create a new chat room</h4>
+               <label for="chatroomname">Name of Room</label>
+               <input type="text" class="form-control" id="chatroomname">
+               <select id="typeofroom" class="form-control">
+                  <option value="private" selected="selected">Private</option>
+                  <option value="public" >Public</option>
+               </select>
+               <div id="setpassword">
+                  <label for="chatroompassword">Password</label>
+                  <input type="text"class="form-control"  id="chatroompassword">
+               </div>
+                     <input type="submit" name="create" id="create" value="Create" class="btn btn-primary">
+            
+            </div>
+            </form>
+         </div>
+         
       </div>
          
             
@@ -185,17 +239,33 @@
          <ul id="people"></ul>
       </div>
       
-      <div id="message">
-         <form>
-            Your message: <input type="text" id="messageToChat">
-                          <input type="button" name="send" id="send" value="Send">
+     
+      <div id="chatlog">
+         
+         <h4>Chatroom Name: <span id="nameOfCurrentChatRoom">CSE330</span></h4>
+
+         <table class="table table-striped" id="msgs">
+            
+               <th class="col-md-1">Username</th>
+               <th class = "col-md-11">Message</th>
+               
+            </tr >
+           
+            
+         </table>
+
+      </div>
+      
+      
+       <div id="message">
+         <form class="form-group">
+            <label for="messageToChat">Enter your message:</label>
+            <input type="text" id="messageToChat" class="form-control" >
+            <input type="button" name="send" id="send" value="Send" class="btn btn-default">
          </form>
       </div>
       
-      <div id="chatlog">
-
-         <ul id="msgs">   
-      </div>
       
+      </div>
    </body>
 </html>
