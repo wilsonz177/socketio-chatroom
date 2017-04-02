@@ -4,9 +4,9 @@ var socketio = require("socket.io");
 var fs = require("fs");
 var people = {};
 var rooms = {};
-rooms["CSE330"] = {
+rooms["CSE330"] = { //initial room available
 				"admin": "",
-				"users": [],
+				"users": {}, //key = username, value = socketid
 				"pub": true,
 				"pass": "",
 				"banned": []
@@ -29,67 +29,147 @@ var io = socketio.listen(app);
 io.sockets.on("connection", function(socket){
 	// This callback runs when a new Socket.IO connection is established.
 	
-	 socket.on("submitusername", function(name){
-        people[socket.id] = { "name" : name, "room" : ""};
-		socket.emit("loadpage", rooms);
+	 socket.on("submitinfo", function(data){
+		var taken = false; //true if username is taken, false otherwise
+		for (var key in people){ //check if username is taken
+			if (data.username == people[key].username){
+				taken = true;
+			}
+		}
+		if(taken){
+			socket.emit("errors", {message:"usernametaken"});
+		}else{
+			people[socket.id] = {"username" : data.username, "room" : "", "firstname": data.firstname, "lastname": data.lastname, "pic": data.pic, "bio": data.bio, "privatemes": {}};
+			socket.emit("loadpage", rooms);
+		}
+       
+    });
+	 
+	socket.on("getusersinfo", function(username){
+			var id;
+			var admin = false;
+			var room = people[socket.id].room;
+			var name = people[socket.id].username;
+			if (rooms[room].admin == name){
+				admin = true;
+			}
+			
+			for (var key in people){
+				if(people[key].username == username){
+					id = key;
+				}
+			}
+			var info = people[id];
+			socket.emit("moreinfo", {"info": info, "admin": admin, "adminname": name});
     });
 
+	socket.on("kickorblock", function(data){
+			
+			var r = people[socket.id].room;
+			var id = rooms[r].users[data.user];
+			
+			people[id].room = "";
+			delete rooms[r].users[data.user]; //delete kicked/blocked user from room
+			
+			var allusersinchatroom = rooms[r].users;
+			
+			for (var a in allusersinchatroom){
+				io.to(allusersinchatroom[a]).emit("update", {"users": allusersinchatroom, "room": r}); //updates everyones list of users in the chatroom
+			}
+			
+			//update everyone's screen
+			if(data.action == "kick"){
+				io.to(id).emit("afterkickedorbanned");
+				io.to(id).emit("loadpage", rooms);
+				io.to(id).emit("errors", {message: "kicked"});
+				io.to(socket.id).emit("clearmoreinfo");
+
+			} else {
+				rooms[r].banned.push(data.user);
+				io.to(id).emit("afterkickedorbanned");
+				io.to(id).emit("loadpage", rooms);
+				io.to(id).emit("errors", {message: "banned"});
+				io.to(socket.id).emit("clearmoreinfo");
+			}
+    });
+	
+	//join room
 	 socket.on("join", function(data){
 		
+		var n = people[socket.id].username; //username
+		var inRoom = n in people; //boolean indicating whether user is already in chatroom
+		var b = false; //boolean indicating if user is banned from room - false initially
+		var switching = false; //boolean indicating if user is switching rooms
 		
-		
-		var b = false;
-		var switching = false;
-		console.log(data);
-		console.log(rooms[data.room].banned);
-		for (var i = 0; i < rooms[data.room].banned.length; ++i){
-			if (people[socket.id].name == rooms[data.room].banned[i]){
+		var usernames = [];
+		var ids = [];
+		var allusersinchatroom = rooms[data.room].users;
+		for (var key in allusersinchatroom){
+			usernames.push(key);
+		}
+
+		for (var i = 0; i < rooms[data.room].banned.length; ++i){ //check if user is banned
+			if (people[socket.id].username == rooms[data.room].banned[i]){
 				b = true;
 			}
 		}
 		
-		for (var j = 0; j < rooms[data.room].banned.length; ++j){
-			if (people[socket.id].name == rooms[data.room].users[j]){
+		for (var x in rooms){ //check if user is switching rooms
+			for (var y in rooms[x].users){
+				if (people[socket.id].username == y){
 				switching = true;
+				}
 			}
 		}
 		
 		if(b){
-			socket.emit("banned");
+			socket.emit("clearchatlog"); 
+			socket.emit("errors", {message:"banned"}); 
+		} else if (inRoom){
+			//socket.emit("clearchatlog"); 
+			socket.emit("errors", {message:"sameroom"});
 		}
-		
 		
 		else{
-		
-		if(switching){
-			for (var key in rooms){
-				
-			for (var k = 0; k < rooms[key].users.length; ++k){
-			if (people[socket.id].name == rooms[data.room].users[k]){
-				rooms[data.room].users.splice(i, 1); //deletes user from a room
-			}
-		}
-				
-			}
-		}
-		
-		if (data.pub == "false"){
-			if (rooms[data.room].pass == data.pass){
-				people[socket.id].room = data.room;
-				rooms[data.room].users.push(socket.id);
-				io.sockets.emit("update", rooms[data.room].users);
-			} else {
-				socket.emit("wrongpassword");
-			}
-		}else{
 
+		if(switching){
+			delete rooms[data.oldroom].users[n]; //deletes user from old room
+			var oldusers = [];
+			for (var k in rooms[data.oldroom].users){
+				oldusers.push(rooms[data.oldroom].users[k]);
+			}
+
+			for (i = 0; i < oldusers.length; ++i) {
+				io.to(oldusers[i]).emit("update", {"users": rooms[data.oldroom].users, "room": data.oldroom});
+			}
+		}
+		
+		if (data.pub == "false"){ //check password for private room
+			if (rooms[data.room].pass == data.pass){
+				io.to(socket.id).emit("clearchatlog");
 				people[socket.id].room = data.room;
-				rooms[data.room].users.push(socket.id);
+				rooms[data.room].users[n] = socket.id; //adds user to room
+				for (var un in rooms[data.room].users){
+					ids.push(rooms[data.room].users[un]);
+				}
+
+				for (i = 0; i < ids.length; ++i) {
+					io.to(ids[i]).emit("update", {"users": rooms[data.room].users, "room": data.room}); //update everyone that new user has joined room
+				}
 				
-				var chatroom = data.room;
-				var allusersinchatroom = rooms[chatroom].users;
-				for (i = 0; i < allusersinchatroom.length; ++i) {
-				io.to(allusersinchatroom[i]).emit("update", rooms[data.room].users);
+			} else {
+				socket.emit("errors", {message: "wrongpassword"});
+			}
+		} else{
+				io.to(socket.id).emit("clearchatlog");
+				people[socket.id].room = data.room;
+				rooms[data.room].users[n] = socket.id; //adds user to room
+				for (var k in rooms[data.room].users){
+					ids.push(rooms[data.room].users[k]);
+				}
+
+				for (i = 0; i < ids.length; ++i) {
+					io.to(ids[i]).emit("update", {"users": rooms[data.room].users, "room": data.room}); //update everyone that new user has joined room
 				}
 		}
 		}
@@ -97,24 +177,60 @@ io.sockets.on("connection", function(socket){
     });
 	 
 	  socket.on("createroom", function(data){
-        var roomAdmin = people[socket.id];
-		console.log("this is the roomname: " + data.roomname);
+		
+		var switching = false;
+		for (var x in rooms){ //check if user is switching rooms
+			for (var y in rooms[x].users){
+				if (people[socket.id].username == y){
+				switching = true;
+				}
+			}
+		}
+		
+		
+        var roomAdmin = people[socket.id].username;
 		rooms[data.roomname] = {
 				"admin": roomAdmin,
-				"users": [roomAdmin],
+				"users": {},
 				"pub": data.pub,
 				"pass": data.password,
 				"banned": []
 		};
-		people[socket.id].room = data.roomname;
+		
+		rooms[data.roomname].users[roomAdmin] = socket.id;
 
-		console.log("about to emit loadpage");
+		if(switching){
+			delete rooms[data.oldroom].users[roomAdmin]; //deletes user from old room
+			var oldusers = [];
+			for (var k in rooms[data.oldroom].users){
+				oldusers.push(rooms[data.oldroom].users[k]);
+			}
+
+			for (i = 0; i < oldusers.length; ++i) {
+				io.to(oldusers[i]).emit("update", {"users": rooms[data.oldroom].users, "room": data.oldroom});
+			}
+		}
+		
+		socket.emit("clearchatlog"); 
+		people[socket.id].room = data.roomname;
 		io.sockets.emit("loadpage", rooms);
-		console.log("emitted loadpage");
-		console.log("about to emit update");
-        socket.emit("update", rooms[data.roomname].users);
+        socket.emit("update", {"users": rooms[data.roomname].users, "room": data.roomname});
 		
     });
+	  
+	//send private message  	
+	socket.on('dm', function(data) {
+		var fromwho = people[socket.id].username;
+		var tosocketid;
+		for (var key in people){
+			if (people[key].username == data.towho){
+				tosocketid = key;
+				people[key].privatemes[fromwho] = data.message;
+			}
+		}
+		
+			io.to(tosocketid).emit("updatedms", {"fromwho": fromwho, "message": data.message}); 
+	});
 	
 //	socket.on("disconnect", function(){
 //        io.sockets.emit("update", people[client.id] + " has left the server.");
@@ -125,11 +241,13 @@ io.sockets.on("connection", function(socket){
 	socket.on('message_to_server', function(msg) {
 		// This callback runs when the server receives a new message from the client.
 		var chatroom = people[socket.id].room;
-		var allusersinchatroom = rooms[chatroom].users;
-		
-		for (i = 0; i < allusersinchatroom.length; ++i) {
-			io.to(allusersinchatroom[i]).emit("message_to_client", people[socket.id].name, msg); // broadcast the message to other users
+		var ids = [];
+		for (var key in rooms[chatroom].users){
+			ids.push(rooms[chatroom].users[key]);
 		}
-		
+
+		for (i = 0; i < ids.length; ++i) {
+			io.to(ids[i]).emit("message_to_client", people[socket.id].username, msg); // broadcast the message to all users in chatroom
+		}
 	});
 });

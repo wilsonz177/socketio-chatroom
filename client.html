@@ -25,73 +25,115 @@
 <!--  border: 1px solid rgba(86,61,124,.2);-->
 <!--}-->
 <!--    </style>-->
- <style>
-   .form-group select{
+      <style>
+      .form-group select{
       display: inline-block;
       width: auto;
-   }
- </style>
- 
+      }
+      </style>
       <script>
       $(document).ready(function() {
          var socketio = io.connect();
-         $("#message").hide();
-         $("#rooms").hide();
-         $("#users").hide();
+         $("#message").hide(); //hides send message functionality
+         $("#rooms").hide(); //hides choice of rooms
+         $("#users").hide(); //hides people in room
+         $("#chatlog").hide(); //hides chatroom conversation
+         $("#privatemessagefeed").hide(); //hides private messages
+         $("#expandedinfo").hide(); //hides more info
+         var usercurrentlyselected = "";
+         var currentroom = "";
+         var images = ["http://dccorporateheadshots.com/wp-content/uploads/2015/12/donaldtrump61815.jpg", "http://cdn.blackenterprise.com/wp-content/blogs.dir/1/files/2014/08/HillaryClinton300232.jpg", "http://www.geekwire.com/wp-content/uploads/obama-headshot.jpg", "https://upload.wikimedia.org/wikipedia/commons/3/3e/Joe_Biden%2C_official_photo_portrait%2C_111th_Congress.jpg"];
+         
          $("form").submit(function(event){
             event.preventDefault();
          });
          
-         $("#submitusername").click(function(){ //just adds the new user
-            var name = $("#name").val();
-            if (name !== "") {
-                socketio.emit("submitusername", name);
-                $("#login").detach();
-                $("#rooms").show();
+         //adds the new user
+         $("#submitinfo").click(function(){ 
+            var firstname = $("#firstname").val();
+            var lastname = $("#lastname").val();
+            var pic = $('input[name=propic]:checked', '#firstform').val();
+            var username = $("#name").val();
+            var bio = $("#bio").val();
+            var data = {"firstname": firstname, "lastname": lastname, "pic": pic, "username": username, "bio": bio};
+            if (data.firstname != "" || data.lastname != "" || data.username != "") {
+                socketio.emit("submitinfo", data);
+                $("#login").hide();
+            }
+            else{
+               $("#errormessages").show();
+               $("#errormessages").html("You have to provide a first name, last name, and a username.");
             }
          });
          
+         //joins a room
          $("#join").click(function(){
-            $("#msgs").empty();    
             var pub = $("#allrooms").val();
-            var room = $("#allrooms option:selected").text();
-            console.log("pub: ", pub);
-            console.log("room: ", room);
+            var newroom = $("#allrooms option:selected").text();
+            var oldroom = currentroom;
             var pass = $("#privatepassword").val();
            
-            socketio.emit("join",{"room": room, "pub":pub, "pass": pass});
+            socketio.emit("join",{"room": newroom, "oldroom": oldroom, "pub":pub, "pass": pass});
          });
          
-          $("#send").click(function(){
-            var msg = $("#messageToChat").val();
+         //send a message to chatroom
+          $("#sendmessage").click(function(){
+            var msg = $("#messagetochatroom").val();
             socketio.emit("message_to_server", msg);
             $("#messageToChat").val("");
          });
           
+         //request more info on a user
+         //$("#moreinfo").click(function(){
+         //   console.log("clicked more info");
+         //   var person = $("#moreinfo").attr("name");
+         //   usercurrentlyselected = person;
+         //   socketio.emit("getusersinfo", person);
+         //});
+         //
+         
+         //request more info on the user
+         $("#people").on('click', '.moreinfo', function(){
+            $("#moreinfofullname").html("");
+            $("#moreinfousername").html("");
+            $("#moreinfobio").html("");
+            var person = $(this).attr("name");
+            usercurrentlyselected = person;
+            socketio.emit("getusersinfo", usercurrentlyselected);
+         });
+         
+         //send private message
+         $("#sendprivatemessage").click(function(){
+            var m = $("#pmessage").val();
+            socketio.emit("dm", {"message": m, "towho": usercurrentlyselected});
+         });
+         
+         //minimize expanded info
+         $("#lessinfo").click(function(){
+            $("#moreinfo").empty();
+            $("#expandedinfo").hide();
+         });
+         
+         $("#kickuser").click(function(){
+            socketio.emit("kickorblock", {"action": "kick", "user": usercurrentlyselected});
+         });
+                  
+         $("#blockuser").click(function(){
+            socketio.emit("kickorblock", {"action": "block", "user": usercurrentlyselected});
+         });
+         
+         //create a new room
          $("#create").click(function(){
              $("#msgs").empty();  
             var roomname = $("#chatroomname").val();
             var type = $("#typeofroom option:selected").text();
             var password = $("#chatroompassword").val();
+            var oldroom = currentroom;
             var a = true;
             if (type == "Private"){
                a = false;
-            }
-            console.log("pressed create");
-            console.log("roomname:" + roomname);
-            console.log("pub?" + a);
-            console.log("password: " + password);
-            socketio.emit("createroom", { "roomname": roomname, "pub": a, "password": password});
-         });
-          
-          
-         $("#message").keydown(function(e){
-            if(e.which == 13) {
-               console.log("enter");
-                var msg = $("#messageToChat").val();
-                socketio.emit("message_to_server", msg);
-                $("#messageToChat").val("");
-            }
+            }           
+            socketio.emit("createroom", { "roomname": roomname, "oldroom": oldroom, "pub": a, "password": password});
          });
          
          $("#typeofroom").on('change', function() {
@@ -100,39 +142,104 @@
             }
             if ($("#typeofroom").val() == "public") {
                 $("#setpassword").hide();
-            }
-            
+            }         
           });
          
-         $("#allrooms").on('change', function() {
-            $("#message").hide();
-            $("#chatlog").hide();
+         //shows and hides password input depending on room selection
+         $("#allrooms").on('change', function() { 
             if ($("#allrooms option:selected").val() == "false") {
                 $("#passwordforprivateroom").show();
             }
             if ($("#allrooms option:selected").val() == "true") {
                $("#passwordforprivateroom").hide();
             }
-            
           });
          
-         socketio.on("banned", function() {
-
-                $("#msgfromroom").append("You're banned from this room!");            
+         //error logs
+         socketio.on("errors", function(data) { //add bootstrap to #errormessages div
+               $("#errormessages").show();
+               if (data.message == "banned"){
+                  $("#message").hide();
+                  $("#chatlog").hide();
+                  $("#error").html("You're banned from this room!");
+               } else if (data.message == "sameroom"){
+                  $("#error").html("You're already in this room!");
+               } else if (data.message == "usernametaken"){
+                  $("#login").show();
+                  $("#error").html("Username taken!");
+               } else if (data.message == "wrongpassword"){
+                  $("#privatepassword").attr("placeholder", "Wrong Password!");
+                  $("#error").html("Wrong password");
+                  //$("#message").hide();
+               }
+               else if (data.message == "kicked"){
+                  $("#error").html("You were kicked!");
+                  $("#message").hide();
+                  $("#chatlog").hide();
+               }
+               else if (data.message == "banned"){
+                  $("#error").html("You were banned!");
+                  $("#message").hide();
+                  $("#chatlog").hide();
+               }
          });
          
-         socketio.on("wrongpassword", function() {     
-               $("#privatepassword").attr("placeholder", "Wrong Password!");
-               $("#message").hide();
+         //clears chat history
+         socketio.on("clearchatlog", function() {
+            $("#msgs").empty();
          });
-       
-         socketio.on("loadpage", function(rooms) {
-            console.log("loading");
-              $("#allrooms").empty();
+         
+         //hides expanded info
+         socketio.on("clearmoreinfo", function() {
+            $("#expandedinfo").hide();
+         });
+                  
+         //updates private inbox
+         socketio.on("updatedms", function(data) {
+            //$("#privatefeed").empty(); 
             
-            $("#passwordforprivateroom").hide();
+               var tr = $("<tr/>");
+               tr.append($("<td/>").text(data.fromwho + ": "));
+               tr.append($("<td/>").text(data.message));
+            $("#privatefeed").append(tr);
+         });
+         
+         //adjusts screen for users that are kicked/banned
+         socketio.on("afterkickedorbanned", function() {
+            $("#messages").hide();
+            $("#chatlog").hide();
+            $("#expandedinfo").hide();
+            $("#users").hide();
+         });
+         
+         //provides more info on a selected user
+         socketio.on("moreinfo", function(data) { //add bootstrap to #errormessages div
+               $("#moreinfopic").attr("src", images[data.info.pic]);
+               $("#moreinfofullname").html("Full Name: " + data.info.firstname + " " + data.info.lastname);
+               $("#moreinfousername").html("Username: " + data.info.username);
+               $("#moreinfobio").html("Bio: " + data.info.bio);
+               $("#expandedinfo").show();
+               $("#kickuser").show();
+               $("#blockuser").show();
+               if(data.admin === false){
+                  $("#kickuser").hide();
+                  $("#blockuser").hide();
+               }          
+               if(data.adminname == data.info.username){ //don't show block or kick when an admin is looking at themselves!
+                  $("#kickuser").hide();
+                  $("#blockuser").hide();
+               } 
+         });
+         
+         //loads all possible rooms to join
+         socketio.on("loadpage", function(rooms) {
+            $("#errormessages").empty();
+            $("#errormessages").hide();
+            $("#allrooms").empty();
+            $("#rooms").show();
+            $("#passwordforprivateroom").hide(); //hides password from private rooms initially because CSE330 is public
+            
             for (var key in rooms){
-               console.log("this is the rooms public/private:" + rooms[key].pub);
 
                if (rooms[key].pub === true){
                   $("#allrooms").append($('<option>', { 
@@ -148,34 +255,37 @@
             }
          });
 
-         socketio.on("update", function(people){
+         //updates everyones list of users in chatroom and chatroom name
+         socketio.on("update", function(data){
+                currentroom = data.room;
                 $("#message").show();
                 $("#chatlog").show();
-                
+                $("#privatemessagefeed").show();
+                $("#nameOfCurrentChatRoom").empty(); 
+                $("#nameOfCurrentChatRoom").append(currentroom); 
                 $("#people").empty();
-                $.each(people, function(socketid, name) {
-                    $('#people').append("" + name + "");
+                $("#users").show();
+              
+                $.each(data.users, function(name, socketid) { //generate moreinfo buttons
+                  var row = $("<tr/>");
+                  var button = $('<input/>').attr({
+                        type: "button",
+                        "class" : "moreinfo",
+                        value: "More Info",
+                        name: name
+                  });
+                  row.append($("<td/>").text(name));
+                  row.append(button);
+                  $("#people").append(row);  
                 });
          });
          
+         //append new message to chatlog
          socketio.on("message_to_client", function(who, msg){
-                //$("#msgs").append("" + who + " says: " + msg + "");
-             console.log("who: ", who);
-             console.log("msg: ", msg);
             var tr = $("<tr/>");
-            tr.append(
-               $("<td/>")
-                  .text(who + ": ")
-            );
-            tr.append(
-               $("<td/>")
-                  .text(msg)
-            );
-               
-               
-                
-            $("#msgs").append(tr);
-                                 
+            tr.append($("<td/>").text(who + ": "));
+            tr.append($("<td/>").text(msg));
+            $("#msgs").append(tr);                   
          });
          
          //socketio.on("disconnect", function(){
@@ -187,9 +297,7 @@
       });
       
       </script>
-      
-      
-   
+
    </head>
    <body>
       <div class="container-fluid">
@@ -199,11 +307,33 @@
       </div>  
             
       <div id="login" class="form-group" >
-         <form>
-            <label for="name">Username</label>
-                      <input type="text" class="form-control" id="name"><br>
-                      <input type="button" name="submitusername" class="btn btn-primary" id="submitusername" value="Submit">
+         <form id ="firstform">
+                     
+                     <input type="text" class="form-control" id="firstname"><br>
+                     <label for="firstname">First Name</label>
+
+                     <input type="text" class="form-control" id="lastname"><br>
+                     <label for="lastname">Last Name</label>
+                     
+                     <input type="text" class="form-control" id="name"><br>
+                     <label for="name">Username</label>
+                     
+                     <p>Choose a profile picture.</p>
+                     <input type="radio" checked="checked" name="propic" value ="0">
+                     <label for="trump"> <img src="http://dccorporateheadshots.com/wp-content/uploads/2015/12/donaldtrump61815.jpg" alt="No Pic" height="50" width="50"/></label><br>
+                     <input type="radio" name="propic" value ="1">
+                     <label for="hillary"> <img src="http://cdn.blackenterprise.com/wp-content/blogs.dir/1/files/2014/08/HillaryClinton300232.jpg" alt="No Pic" height="50" width="50"/></label><br>
+                     <input type="radio" name="propic" value ="2">
+                     <label for="obama"> <img src="http://www.geekwire.com/wp-content/uploads/obama-headshot.jpg" alt="No Pic" height="50" width="50"/></label><br>
+                     <input type="radio" name="propic" value ="3">
+                     <label for="biden"> <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Joe_Biden%2C_official_photo_portrait%2C_111th_Congress.jpg" alt="No Pic" height="50" width="50"/></label><br>
+
+                     <textarea name="bio" id="bio" cols="40" rows="5"></textarea>
+                     <label for="bio">Add a quick note about yourself that you want people to know!</label>
+
+                     <input type="button" name="submitinfo" class="btn btn-primary" id="submitinfo" value="Submit">
          </form>
+         
       </div>
       
       
@@ -219,7 +349,7 @@
             </div>
          </div>
          
-         <span id="msgfromroom">  
+         <div id="errormessages"><span id="error"></span></div>
          
          <input type="button" name="join" id="join" value="Join" class="btn btn-primary">
          
@@ -242,28 +372,44 @@
             </div>
             </form>
          </div>
-         
       </div>
          
             
       <div id="users">
-         People: 
-         <ul id="people"></ul>
+         <h3>People in this chatroom</h3>
+         <table class="table table-striped" id="people">
+            <tr>
+               <th class="col-md-1">Username</th>
+             </tr>  
+         </table>   
       </div>
       
+      <div id="expandedinfo">
+
+         <table id="allinfo">
+            <tr><img src="bidenpic" alt="No Pic" id="moreinfopic" height="50" width="50"/></tr><br>
+            <tr id="moreinfofullname"></tr>
+            <tr id="moreinfousername"></tr>
+            <tr id="moreinfobio"></tr>
+            <input type="text" id="pmessage" class="form-control" >
+            <input type="button" id="sendprivatemessage" value="Send Private Message" class="btn btn-default">
+            <input type="button" id="blockuser" value="Block User" class="btn btn-default">
+            <input type="button" id="kickuser" value="Kick User" class="btn btn-default">
+            <input type="button" id="lessinfo" value="Less Info" class="btn btn-default">
+            
+         </table>
+
+      </div>
      
       <div id="chatlog">
          
-         <h4>Chatroom Name: <span id="nameOfCurrentChatRoom">CSE330</span></h4>
+         <h4>Chatroom Name: <span id="nameOfCurrentChatRoom"></span></h4>
 
          <table class="table table-striped" id="msgs">
-            
+            <tr>
                <th class="col-md-1">Username</th>
                <th class = "col-md-11">Message</th>
-               
-            </tr >
-           
-            
+             </tr>  
          </table>
 
       </div>
@@ -271,13 +417,22 @@
       
        <div id="message">
          <form class="form-group">
-            <label for="messageToChat">Enter your message:</label>
-            <input type="text" id="messageToChat" class="form-control" >
-            <input type="button" name="send" id="send" value="Send" class="btn btn-default">
+            <label for="messagetochatroom">Enter your message:</label>
+            <input type="text" id="messagetochatroom" class="form-control" >
+            <input type="button" name="send" id="sendmessage" value="Send" class="btn btn-default">
          </form>
       </div>
-      
-      
+       
+      <div id="privatemessagefeed">
+         <h4>Private Messages</h4>
+         <table class="table table-striped" id="privatefeed">
+            <tr>
+               <th class="col-md-1">Username</th>
+               <th class = "col-md-11">Message</th>
+             </tr>  
+         </table>
+      </div>
+       
       </div>
    </body>
 </html>
