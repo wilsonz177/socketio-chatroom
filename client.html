@@ -15,20 +15,22 @@
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
       <script src="/socket.io/socket.io.js"></script>
 
-<!--<style>-->
-<!--      [class*="col-"] {-->
-<!--  padding-top: 15px;-->
-<!--  padding-bottom: 15px;-->
-<!--  background-color: #eee;-->
-<!--  background-color: rgba(86,61,124,.15);-->
-<!--  border: 1px solid #ddd;-->
-<!--  border: 1px solid rgba(86,61,124,.2);-->
-<!--}-->
-<!--    </style>-->
+<!--<style>
+     [class*="col-"] {
+ padding-top: 15px;
+  padding-bottom: 15px;
+ background-color: #eee;
+  background-color: rgba(86,61,124,.15);
+  border: 1px solid #ddd;
+  border: 1px solid rgba(86,61,124,.2);
+}    </style>-->
       <style>
       .form-group select{
       display: inline-block;
       width: auto;
+      }
+      #errormessages{
+         color: red;
       }
       </style>
       <script>
@@ -40,9 +42,13 @@
          $("#chatlog").hide(); //hides chatroom conversation
          $("#privatemessagefeed").hide(); //hides private messages
          $("#expandedinfo").hide(); //hides more info
+         $("#errormessages").hide();
          var usercurrentlyselected = "";
          var currentroom = "";
          var images = ["http://dccorporateheadshots.com/wp-content/uploads/2015/12/donaldtrump61815.jpg", "http://cdn.blackenterprise.com/wp-content/blogs.dir/1/files/2014/08/HillaryClinton300232.jpg", "http://www.geekwire.com/wp-content/uploads/obama-headshot.jpg", "https://upload.wikimedia.org/wikipedia/commons/3/3e/Joe_Biden%2C_official_photo_portrait%2C_111th_Congress.jpg"];
+         
+         
+         
          
          $("form").submit(function(event){
             event.preventDefault();
@@ -62,7 +68,7 @@
             }
             else{
                $("#errormessages").show();
-               $("#errormessages").html("You have to provide a first name, last name, and a username.");
+               $("#error").text("You have to provide a first name, last name, and a username.");
             }
          });
          
@@ -80,8 +86,19 @@
           $("#sendmessage").click(function(){
             var msg = $("#messagetochatroom").val();
             socketio.emit("message_to_server", msg);
-            $("#messageToChat").val("");
+            $("#messagetochatroom").val("");
          });
+          
+         //sends message when enter key is pressed
+         $("#messagetochatroom").keydown(function(e){
+            if(e.keyCode === 13){
+               var msg = $("#messagetochatroom").val();
+               socketio.emit("message_to_server", msg);
+               $("#messagetochatroom").val("");
+            }
+            
+         }); 
+          
           
          //request more info on a user
          //$("#moreinfo").click(function(){
@@ -106,6 +123,16 @@
          $("#sendprivatemessage").click(function(){
             var m = $("#pmessage").val();
             socketio.emit("dm", {"message": m, "towho": usercurrentlyselected});
+            $("#pmessage").val("");
+         });
+         
+         //sends private message when you press enter key
+         $("#pmessage").keydown(function(e){
+            if(e.keyCode === 13){
+               var m = $("#pmessage").val();
+               socketio.emit("dm", {"message": m, "towho": usercurrentlyselected});
+               $("#pmessage").val("");
+            }
          });
          
          //minimize expanded info
@@ -124,7 +151,17 @@
          
          //create a new room
          $("#create").click(function(){
-             $("#msgs").empty();  
+             $("#msgs").empty();
+             var tBody = $("<tbody/>");
+             var msgHeader = $("<tr/>");
+               msgHeader.append($("<th/>")
+                                .addClass("col-mid-2")
+                                .text("Username"));
+               msgHeader.append($("<th/>")
+                                .addClass("col-mid-10")
+                                .text("Message"));
+             tBody.append(msgHeader);
+             $("#msgs").append(tBody);
             var roomname = $("#chatroomname").val();
             var type = $("#typeofroom option:selected").text();
             var password = $("#chatroompassword").val();
@@ -169,7 +206,7 @@
                   $("#error").html("Username taken!");
                } else if (data.message == "wrongpassword"){
                   $("#privatepassword").attr("placeholder", "Wrong Password!");
-                  $("#error").html("Wrong password");
+                  $("#error").text("Wrong password");
                   //$("#message").hide();
                }
                else if (data.message == "kicked"){
@@ -187,6 +224,17 @@
          //clears chat history
          socketio.on("clearchatlog", function() {
             $("#msgs").empty();
+            var tBody = $("<tbody/>");
+             var msgHeader = $("<tr/>");
+               msgHeader.append($("<th/>")
+                                .addClass("col-mid-2")
+                                .text("Username"));
+               msgHeader.append($("<th/>")
+                                .addClass("col-mid-10")
+                                .text("Message"));
+             tBody.append(msgHeader);
+             $("#msgs").append(tBody);
+             $("#error").empty();
          });
          
          //hides expanded info
@@ -234,6 +282,10 @@
          //loads all possible rooms to join
          socketio.on("loadpage", function(rooms) {
             $("#errormessages").empty();
+            var tempSpan = $("<span/>").attr({
+               "id" : "error"
+            });
+            $("#errormessages").append(tempSpan);
             $("#errormessages").hide();
             $("#allrooms").empty();
             $("#rooms").show();
@@ -275,7 +327,9 @@
                         name: name
                   });
                   row.append($("<td/>").text(name));
-                  row.append(button);
+                  
+                  
+                  row.append($("<td/>").append(button));
                   $("#people").append(row);  
                 });
          });
@@ -283,8 +337,12 @@
          //append new message to chatlog
          socketio.on("message_to_client", function(who, msg){
             var tr = $("<tr/>");
-            tr.append($("<td/>").text(who + ": "));
-            tr.append($("<td/>").text(msg));
+            //tr.addClass("row");
+            tr.append($("<td/>")
+                      .text(who + ": ")
+                      .addClass("col-md-2"));
+            tr.append($("<td/>").text(msg)
+                      .addClass("col-md-10"));
             $("#msgs").append(tr);                   
          });
          
@@ -293,6 +351,8 @@
          //   $("#message").attr("disabled", "disabled");
          //   $("#send").attr("disabled", "disabled");
          //});
+         
+         
              
       });
       
@@ -308,17 +368,25 @@
             
       <div id="login" class="form-group" >
          <form id ="firstform">
-                     
-                     <input type="text" class="form-control" id="firstname"><br>
-                     <label for="firstname">First Name</label>
-
-                     <input type="text" class="form-control" id="lastname"><br>
-                     <label for="lastname">Last Name</label>
-                     
-                     <input type="text" class="form-control" id="name"><br>
+                     <div class="input-group-lg">
                      <label for="name">Username</label>
+                     <input type="text" class="form-control" id="name"><br>
+                     </div>
                      
-                     <p>Choose a profile picture.</p>
+                     
+                     <div class="input-group-sm">
+                     <label for="firstname">First Name</label>
+                     <input type="text" class="form-control" id="firstname"><br>
+                     </div>
+                     
+                     <div class="input-group-sm">
+                     <label for="lastname">Last Name</label>
+                     <input type="text" class="form-control" id="lastname"><br>
+                     </div>
+                     
+                    
+                     
+                     <h3> Choose your profile picture </h3>
                      <input type="radio" checked="checked" name="propic" value ="0">
                      <label for="trump"> <img src="http://dccorporateheadshots.com/wp-content/uploads/2015/12/donaldtrump61815.jpg" alt="No Pic" height="50" width="50"/></label><br>
                      <input type="radio" name="propic" value ="1">
@@ -327,15 +395,15 @@
                      <label for="obama"> <img src="http://www.geekwire.com/wp-content/uploads/obama-headshot.jpg" alt="No Pic" height="50" width="50"/></label><br>
                      <input type="radio" name="propic" value ="3">
                      <label for="biden"> <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Joe_Biden%2C_official_photo_portrait%2C_111th_Congress.jpg" alt="No Pic" height="50" width="50"/></label><br>
-
-                     <textarea name="bio" id="bio" cols="40" rows="5"></textarea>
+<br>
                      <label for="bio">Add a quick note about yourself that you want people to know!</label>
-
+                     <textarea name="bio" id="bio" cols="40" rows="5" class="form-control"></textarea>
+      
                      <input type="button" name="submitinfo" class="btn btn-primary" id="submitinfo" value="Submit">
          </form>
          
       </div>
-      
+      <h4 id="errormessages">ERROR: <span id="error"></span></h4>
       
       <div id="rooms">
          <div class="form-group">
@@ -349,7 +417,7 @@
             </div>
          </div>
          
-         <div id="errormessages"><span id="error"></span></div>
+         <!--<div id="errormessages">ERROR: <span id="error"></span></div>-->
          
          <input type="button" name="join" id="join" value="Join" class="btn btn-primary">
          
@@ -375,40 +443,42 @@
       </div>
          
             
-      <div id="users">
-         <h3>People in this chatroom</h3>
-         <table class="table table-striped" id="people">
+      <div id="users" class="row">
+         <h4>People in this chatroom</h4>
+         <table class="table table-hover" id="people">
             <tr>
-               <th class="col-md-1">Username</th>
+               <th>Username</th>
              </tr>  
          </table>   
       </div>
       
-      <div id="expandedinfo">
+      <div id="expandedinfo" class = "input-group">
 
          <table id="allinfo">
-            <tr><img src="bidenpic" alt="No Pic" id="moreinfopic" height="50" width="50"/></tr><br>
-            <tr id="moreinfofullname"></tr>
-            <tr id="moreinfousername"></tr>
-            <tr id="moreinfobio"></tr>
-            <input type="text" id="pmessage" class="form-control" >
-            <input type="button" id="sendprivatemessage" value="Send Private Message" class="btn btn-default">
-            <input type="button" id="blockuser" value="Block User" class="btn btn-default">
-            <input type="button" id="kickuser" value="Kick User" class="btn btn-default">
-            <input type="button" id="lessinfo" value="Less Info" class="btn btn-default">
+            <tr><td><h4 id="moreinfousername"></h4></td></tr>
+            <tr><td><img src="bidenpic" alt="No Pic" id="moreinfopic" height="50" width="50"/></td></tr><br>
+            <tr><td><h5 id="moreinfofullname"></h5></td></tr>
+            <tr><td><h6 id="moreinfobio"></h6></td></tr>
             
          </table>
+            <input type="text" id="pmessage" class="form-control" >
+            <input type="button" id="sendprivatemessage" value="Send Private Message" class="btn btn-primary">
+            <input type="button" id="blockuser" value="Block User" class="btn btn-danger">
+            <input type="button" id="kickuser" value="Kick User" class="btn btn-warning">
+            <input type="button" id="lessinfo" value="Less Info" class="btn btn-info">
+            
+         
 
       </div>
      
-      <div id="chatlog">
+      <div id="chatlog" class="row" >
          
-         <h4>Chatroom Name: <span id="nameOfCurrentChatRoom"></span></h4>
+         <h3>Chatroom Name: <span id="nameOfCurrentChatRoom"></span></h3>
 
          <table class="table table-striped" id="msgs">
             <tr>
-               <th class="col-md-1">Username</th>
-               <th class = "col-md-11">Message</th>
+               <th class="col-md-2">Username</th>
+               <th class = "col-md-10">Message</th>
              </tr>  
          </table>
 
@@ -423,12 +493,12 @@
          </form>
       </div>
        
-      <div id="privatemessagefeed">
+      <div id="privatemessagefeed" class="row">
          <h4>Private Messages</h4>
          <table class="table table-striped" id="privatefeed">
             <tr>
-               <th class="col-md-1">Username</th>
-               <th class = "col-md-11">Message</th>
+               <th class="col-md-2">Username</th>
+               <th class = "col-md-10">Message</th>
              </tr>  
          </table>
       </div>
