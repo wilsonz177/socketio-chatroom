@@ -5,19 +5,19 @@ var fs = require("fs");
 var people = {};
 var rooms = {};
 rooms["CSE330"] = { //initial room available
-				"admin": "",
-				"users": {}, //key = username, value = socketid
-				"pub": true,
-				"pass": "",
-				"banned": []
-		};
+	"admin": "",
+	"users": {}, //key = username, value = socketid
+	"pub": true,
+	"pass": "",
+                "banned": []
+                };
 // Listen for HTTP connections.  This is essentially a miniature static file server that only serves our one file, client.html:
 var app = http.createServer(function(req, resp){
 	// This callback runs when a new connection is made to our HTTP server.
  
-	fs.readFile("client.html", function(err, data){
-		// This callback runs when the client.html file has been read from the filesystem.
-		if(err) return resp.writeHead(500);
+fs.readFile("client.html", function(err, data){
+	// This callback runs when the client.html file has been read from the filesystem.
+	if(err) return resp.writeHead(500);
 		resp.writeHead(200);
 		resp.end(data);
 	});
@@ -176,7 +176,7 @@ io.sockets.on("connection", function(socket){
 		
     });
 	 
-	  socket.on("createroom", function(data){
+	socket.on("createroom", function(data){
 		
 		var switching = false;
 		for (var x in rooms){ //check if user is switching rooms
@@ -188,7 +188,7 @@ io.sockets.on("connection", function(socket){
 		}
 		
 		
-        var roomAdmin = people[socket.id].username;
+                var roomAdmin = people[socket.id].username;
 		rooms[data.roomname] = {
 				"admin": roomAdmin,
 				"users": {},
@@ -232,11 +232,21 @@ io.sockets.on("connection", function(socket){
 			io.to(tosocketid).emit("updatedms", {"fromwho": fromwho, "message": data.message}); 
 	});
 	
-//	socket.on("disconnect", function(){
-//        io.sockets.emit("update", people[client.id] + " has left the server.");
-//        delete people[client.id];
-//        io.sockets.emit("update-people", people);
-//    });
+                //handles disconnecting users
+                socket.on("disconnect", function(){
+                                var r = people[socket.id].room;
+                                var n = people[socket.id].username;
+                                delete rooms[r].users[n]; //deletes user from old room
+                                delete people[socket.id]; //deletes user
+                                var users = [];
+		for (var k in rooms[r].users){
+			users.push(rooms[r].users[k]);
+		}
+
+		for (i = 0; i < users.length; ++i) {
+			io.to(users[i]).emit("update", {"users": rooms[r].users, "room": r});
+		}
+              });
 	
 	socket.on('message_to_server', function(msg) {
 		// This callback runs when the server receives a new message from the client.
